@@ -1,0 +1,193 @@
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --ink: #0F1620;
+  --steel: #16202C;
+  --panel: #1D2A38;
+  --panel2: #243340;
+  --line: #314252;
+  --alum: #ECF1F6;
+  --alum-dim: #93A2B2;
+  --brand: #1F77C9;
+  --brand-core: #005DA4;
+  --brand-lite: #4B9BDD;
+  --amber: #FFB323;
+  --font-display: 'Rubik', 'Arial Hebrew', system-ui, sans-serif;
+  --font-body: 'Rubik', 'Arial Hebrew', system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--alum);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+::selection { background: var(--brand); color: #fff; }
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; }
+
+/* =========================================================================
+   Layout - mobile first. Base rules target phones; min-width queries
+   progressively enhance for tablet / desktop.
+   ========================================================================= */
+
+/* NAV */
+.ga-nav {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ga-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+@media (min-width: 768px) {
+  .ga-nav { padding: 12px 22px; gap: 18px; }
+  .ga-nav-links { gap: 22px; font-size: 15px; }
+}
+
+/* HERO */
+.ga-hero {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 48px 16px 56px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: center;
+}
+@media (min-width: 880px) {
+  .ga-hero {
+    padding: 78px 22px 88px;
+  }
+}
+
+/* Generic content section */
+.ga-section {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 56px 16px;
+}
+@media (min-width: 768px) {
+  .ga-section { padding: 84px 22px; }
+}
+
+/* ABOUT */
+.ga-about-grid {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 56px 16px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  align-items: center;
+}
+@media (min-width: 880px) {
+  .ga-about-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 40px;
+    padding: 78px 22px;
+  }
+}
+
+/* CONTACT card grid */
+.ga-grid-contact {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (min-width: 560px) {
+  .ga-grid-contact {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+  }
+}
+
+/* FOOTER */
+.ga-footer-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+@media (min-width: 768px) {
+  .ga-footer-inner { padding: 40px 22px; }
+}
+
+/* =========================================================================
+   Animated hero background — the technical grid slowly drifts while a soft
+   blue glow breathes and floats. Disabled under prefers-reduced-motion below.
+   ========================================================================= */
+
+/* Grid pans by exactly one tile (46px) so the loop is seamless. */
+@keyframes ga-grid-pan {
+  from { background-position: 0 0; }
+  to   { background-position: 46px 46px; }
+}
+.ga-hero-bg {
+  animation: ga-grid-pan 18s linear infinite;
+  will-change: background-position;
+}
+
+/* Primary glow gently breathes and drifts. Scale stays >1 so it never
+   uncovers the section edges. */
+@keyframes ga-glow-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1.04); opacity: .85; }
+  50%  { transform: translate3d(-3%, 2%, 0) scale(1.12); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) scale(1.04); opacity: .85; }
+}
+.ga-hero-glow {
+  animation: ga-glow-drift 16s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* A second, roaming blue blob layered behind the content for extra depth. */
+.ga-hero-bg::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(40% 40% at 50% 50%, rgba(75, 155, 221, .16), transparent 70%);
+  animation: ga-blob-roam 22s ease-in-out infinite;
+  will-change: transform;
+}
+@keyframes ga-blob-roam {
+  0%   { transform: translate3d(-12%, -6%, 0); }
+  33%  { transform: translate3d(14%, 8%, 0); }
+  66%  { transform: translate3d(-6%, 12%, 0); }
+  100% { transform: translate3d(-12%, -6%, 0); }
+}
+
+/* Interactions */
+.ga-link { transition: color .2s ease; }
+.ga-link:hover { color: var(--brand-lite); }
+.ga-card {
+  transition: transform .25s cubic-bezier(.2,.7,.2,1), border-color .25s ease, background .25s ease;
+}
+.ga-card:hover { transform: translateY(-4px); border-color: var(--brand); background: var(--panel2); }
+.ga-btn { transition: transform .15s ease, background .2s ease, color .2s ease; }
+.ga-btn:hover { transform: translateY(-2px); }
+.ga-btn:active { transform: translateY(0); }
+.ga-focus:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
