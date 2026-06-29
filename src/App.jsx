@@ -258,19 +258,144 @@ function LoginPage({ onSuccess, onBack }) {
 }
 
 function PrivatePage({ onLogout, onBack }) {
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState(null); // { type: 'ok' | 'err', text }
+  const fileRef = useRef(null);
+
+  const base = import.meta.env.VITE_UPLOAD_URL || "http://localhost:4000";
+
+  const fmtAmount = (n) => (typeof n === 'number' ? n.toLocaleString('he-IL') : n);
+
+  const handleUpload = async () => {
+    const file = fileRef.current?.files?.[0];
+    if (!file) { setUploadMsg({ type: 'err', text: 'בחר קובץ תחילה' }); return; }
+    setUploadMsg(null);
+    try {
+      setUploading(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(base + "/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+      setUploadMsg({ type: 'ok', text: `הועלו ${data.rows} שורות ל-${data.customersCount} לקוחות` });
+      if (fileRef.current) fileRef.current.value = "";
+      await fetchCustomers();
+    } catch (err) {
+      setUploadMsg({ type: 'err', text: 'שגיאה בהעלאה: ' + err });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch(base + "/customers");
+      const data = await res.json();
+      setCustomers(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error(err);
+      setCustomers([]);
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  const deleteDebt = async (customerName, idx) => {
+    if (!confirm(`להסיר חוב מס' ${idx + 1} של ${customerName}?`)) return;
+    try {
+      const res = await fetch(base + "/delete-debt", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName, debtIndex: idx }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || 'Error');
+      await fetchCustomers();
+    } catch (err) { alert('שגיאה: ' + err); }
+  };
+
+  const deleteCustomer = async (customerName) => {
+    if (!confirm(`להסיר את הלקוח "${customerName}" וכל החובות שלו?`)) return;
+    try {
+      const res = await fetch(base + "/delete-customer", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || 'Error');
+      await fetchCustomers();
+    } catch (err) { alert('שגיאה: ' + err); }
+  };
+
   return (
-    <main style={{ maxWidth: 820, margin: "0 auto", padding: "56px 22px 90px" }}>
-      <button onClick={onBack} className="ga-link ga-focus" style={{ ...navBtn, fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--brand-lite)", marginBottom: 26 }}>→ חזרה לדף הבית</button>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+    <main style={{ maxWidth: 920, margin: "0 auto", padding: "32px 22px 90px" }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 18 }}>
         <div>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--brand-lite)" }}>// אזור אישי</span>
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px,5vw,40px)", margin: "10px 0 0" }}>אזור אישי</h1>
+          <button onClick={onBack} className="ga-link ga-focus" style={{ ...navBtn, fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--brand-lite)', marginBottom: 6 }}>→ חזרה לדף הבית</button>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--brand-lite)' }}>// אזור אישי</div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px,4vw,30px)', margin: '6px 0 0' }}>אזור אישי</h1>
         </div>
-        <button onClick={onLogout} className="ga-btn ga-focus" style={ghostBtn}>התנתקות</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <label style={{ fontSize: 13, color: 'var(--alum-dim)' }}>העלה קובץ XLSX</label>
+          <input ref={fileRef} id="debt-file" type="file" accept=".xlsx,.xls" disabled={uploading} />
+          <button onClick={handleUpload} disabled={uploading} className="ga-btn ga-focus" style={ghostBtn}>{uploading ? 'מעלה...' : 'העלה'}</button>
+          <button onClick={fetchCustomers} className="ga-btn ga-focus" style={ghostBtn}>רענן</button>
+          <button onClick={onLogout} className="ga-btn ga-focus" style={ghostBtn}>התנתקות</button>
+        </div>
       </div>
-      <p style={{ color: "var(--alum-dim)", lineHeight: 1.8, fontSize: 16, margin: "18px 0 0" }}>
-        ברוכים הבאים לאזור האישי. כאן ניתן להוסיף תוכן פנימי המיועד לבעלי הרשאה בלבד.
-      </p>
+
+      {uploadMsg && (
+        <p role="alert" style={{ margin: '0 0 14px', fontSize: 14, color: uploadMsg.type === 'ok' ? 'var(--brand-lite)' : '#ff8a8a' }}>{uploadMsg.text}</p>
+      )}
+
+      <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 14, background: 'var(--panel)' }}>
+        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ color: 'var(--alum-dim)' }}>לקוחות וחשבונות (הצג/מחק)</div>
+          <div style={{ color: 'var(--alum-dim)' }}>{loading ? 'טוען...' : `${customers.length} לקוחות`}</div>
+        </div>
+
+        {customers.length === 0 ? (
+          <div style={{ color: 'var(--alum-dim)' }}>אין לקוחות להצגה</div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {customers.map((c) => (
+              <div key={c.code || c.name} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: 12, background: 'var(--panel2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontFamily: 'var(--font-display)' }}>
+                      {c.name}{c.code && <span style={{ color: 'var(--alum-dim)', fontFamily: 'var(--font-mono)', fontSize: 13 }}> · {c.code}</span>}
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 4, fontSize: 13, color: 'var(--alum-dim)' }}>
+                      {c.phone && <a href={`tel:${c.phone}`} className="ga-focus" style={{ color: 'var(--brand-lite)', fontFamily: 'var(--font-mono)' }}>{c.phone}</a>}
+                      {c.contact && <span>איש קשר: {c.contact}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+                    {c.total != null && (
+                      <div style={{ textAlign: 'left' }}>
+                        <div style={{ fontSize: 11, color: 'var(--alum-dim)' }}>סה"כ חוב</div>
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15 }}>{fmtAmount(c.total)} ₪</div>
+                      </div>
+                    )}
+                    <button onClick={() => deleteCustomer(c.name)} className="ga-btn ga-focus" style={ghostBtn}>מחק לקוח</button>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+                  {Array.isArray(c.debts) && c.debts.length > 0 ? c.debts.map((d, i) => (
+                    <div key={i} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto', gap: 12, alignItems: 'center', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--panel)', fontSize: 14 }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--alum-dim)' }}>{d.date}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.asmachta}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>{fmtAmount(d.amount)} ₪</span>
+                      <span style={{ fontSize: 12, color: d.status === 'פתוח' ? 'var(--brand-lite)' : 'var(--alum-dim)' }}>{d.status}</span>
+                      <button onClick={() => deleteDebt(c.name, i)} className="ga-btn ga-focus" style={{ ...ghostBtn, padding: '4px 8px', fontSize: 12 }}>מחק</button>
+                    </div>
+                  )) : (
+                    <div style={{ color: 'var(--alum-dim)' }}>אין חובות</div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </main>
   );
 }
