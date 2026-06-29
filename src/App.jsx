@@ -86,13 +86,11 @@ export default function App() {
           <button onClick={() => { setView("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="ga-focus" style={{ background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 8 }}>
             <img src="/logo.webp" alt='גל-מערכות רכב (1992) בע"מ' style={{ height: 42, background: "#fff", borderRadius: 6, padding: "4px 8px" }} />
           </button>
-          <div style={{ flex: 1 }} />
           <div className="ga-nav-links">
             <button className="ga-link ga-focus" onClick={() => go("about")} style={navBtn}>אודות</button>
             <button className="ga-link ga-focus" onClick={() => go("contact")} style={navBtn}>צור קשר</button>
             <button className="ga-link ga-focus" onClick={openPrivacy} style={navBtn}>מדיניות פרטיות</button>
             <button className="ga-link ga-focus" onClick={openLogin} style={navBtn}>{authed ? "אזור אישי" : "כניסה"}</button>
-            <button onClick={() => go("contact")} className="ga-btn ga-focus" style={{ ...primaryBtn, padding: "9px 18px", fontSize: 14 }}>דברו איתנו</button>
           </div>
         </nav>
       </header>
@@ -137,10 +135,6 @@ function Home({ go }) {
         <div className="ga-hero-glow" style={{ position: "absolute", inset: 0, background: "radial-gradient(120% 90% at 80% 0%, rgba(31,119,201,.18), transparent 55%), linear-gradient(180deg, rgba(15,22,32,.3), var(--ink) 92%)" }} />
         <div className="ga-hero">
           <Reveal style={{ textAlign: "center" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 10, border: "1px solid var(--line)", borderRadius: 999, padding: "6px 14px", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--brand-lite)", marginBottom: 22 }}>
-              <span style={{ width: 7, height: 7, borderRadius: 99, background: "var(--brand)" }} />
-              יבוא ושיווק חלקי רכב · מאז 1992
-            </div>
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(34px, 5vw, 60px)", lineHeight: 1.08, margin: "0 0 20px", color: "var(--alum)" }}>
               מנועים, תיבות הילוכים<br />וחלקי רכב - <span style={{ color: "var(--brand-lite)" }}>לכל רכב</span>
             </h1>
