@@ -8,6 +8,10 @@ import { useState, useEffect, useRef } from "react";
 //  ▸ אם הטמעתם פיקסל של פייסבוק (Meta Pixel) - ראו סעיף 5 במדיניות הפרטיות.
 // =============================================================================
 
+// סיסמת הכניסה לאזור הפרטי. שימו לב: זהו שער בצד-לקוח בלבד ואינו אבטחה אמיתית -
+// הסיסמה גלויה בקוד המקור של הדף. מתאים להגבלת גישה קלה בלבד.
+const PRIVATE_PASSWORD = "Gal123!";
+
 const navBtn = { background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "inherit", padding: 0 };
 const primaryBtn = { background: "var(--brand)", color: "#fff", border: "none", borderRadius: 8, padding: "13px 26px", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "0 6px 22px rgba(31,119,201,.30)" };
 const ghostBtn = { background: "transparent", color: "var(--alum)", border: "1px solid var(--line)", borderRadius: 8, padding: "13px 26px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" };
@@ -48,6 +52,21 @@ function Reveal({ children, delay = 0, style }) {
 
 export default function App() {
   const [view, setView] = useState("home");
+  const [authed, setAuthed] = useState(() => {
+    try { return sessionStorage.getItem("ga-auth") === "1"; } catch { return false; }
+  });
+
+  const login = () => {
+    setAuthed(true);
+    try { sessionStorage.setItem("ga-auth", "1"); } catch {}
+  };
+  const logout = () => {
+    setAuthed(false);
+    try { sessionStorage.removeItem("ga-auth"); } catch {}
+    setView("home");
+    window.scrollTo({ top: 0 });
+  };
+  const openLogin = () => { setView("login"); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   const go = (id) => {
     if (view !== "home") {
@@ -72,12 +91,21 @@ export default function App() {
             <button className="ga-link ga-focus" onClick={() => go("about")} style={navBtn}>אודות</button>
             <button className="ga-link ga-focus" onClick={() => go("contact")} style={navBtn}>צור קשר</button>
             <button className="ga-link ga-focus" onClick={openPrivacy} style={navBtn}>מדיניות פרטיות</button>
+            <button className="ga-link ga-focus" onClick={openLogin} style={navBtn}>{authed ? "אזור אישי" : "כניסה"}</button>
             <button onClick={() => go("contact")} className="ga-btn ga-focus" style={{ ...primaryBtn, padding: "9px 18px", fontSize: 14 }}>דברו איתנו</button>
           </div>
         </nav>
       </header>
 
-      {view === "privacy" ? <PrivacyPage onBack={() => { setView("home"); window.scrollTo({ top: 0 }); }} /> : <Home go={go} />}
+      {view === "privacy" ? (
+        <PrivacyPage onBack={() => { setView("home"); window.scrollTo({ top: 0 }); }} />
+      ) : view === "login" ? (
+        authed
+          ? <PrivatePage onLogout={logout} onBack={() => { setView("home"); window.scrollTo({ top: 0 }); }} />
+          : <LoginPage onSuccess={login} onBack={() => { setView("home"); window.scrollTo({ top: 0 }); }} />
+      ) : (
+        <Home go={go} />
+      )}
 
       {/* FOOTER */}
       <footer style={{ borderTop: "1px solid var(--line)", background: "var(--steel)" }}>
@@ -179,6 +207,75 @@ function Home({ go }) {
           ))}
         </div>
       </section>
+    </main>
+  );
+}
+
+function LoginPage({ onSuccess, onBack }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState(false);
+
+  const submit = (e) => {
+    e.preventDefault();
+    if (password === PRIVATE_PASSWORD) {
+      setError(false);
+      onSuccess();
+    } else {
+      setError(true);
+    }
+  };
+
+  const field = {
+    width: "100%", boxSizing: "border-box", background: "var(--ink)", color: "var(--alum)",
+    border: `1px solid ${error ? "#e25" : "var(--line)"}`, borderRadius: 10, padding: "14px 16px",
+    fontSize: 16, fontFamily: "var(--font-body)", outline: "none",
+  };
+
+  return (
+    <main style={{ maxWidth: 440, margin: "0 auto", padding: "72px 22px 110px" }}>
+      <button onClick={onBack} className="ga-link ga-focus" style={{ ...navBtn, fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--brand-lite)", marginBottom: 26 }}>→ חזרה לדף הבית</button>
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--brand-lite)" }}>// כניסה</span>
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px,5vw,40px)", margin: "10px 0 8px" }}>כניסה לאזור אישי</h1>
+      <p style={{ color: "var(--alum-dim)", lineHeight: 1.8, fontSize: 15.5, margin: "0 0 26px" }}>
+        אזור זה מוגן בסיסמה. הזינו את הסיסמה כדי להמשיך.
+      </p>
+
+      <form onSubmit={submit} style={{ border: "1px solid var(--line)", borderRadius: 14, background: "var(--panel)", padding: "24px 22px" }}>
+        <label htmlFor="ga-pw" style={{ display: "block", fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--brand-lite)", marginBottom: 10 }}>סיסמה</label>
+        <input
+          id="ga-pw"
+          type="password"
+          value={password}
+          onChange={(e) => { setPassword(e.target.value); if (error) setError(false); }}
+          className="ga-focus"
+          style={field}
+          autoFocus
+          autoComplete="current-password"
+          aria-invalid={error}
+        />
+        {error && (
+          <p role="alert" style={{ color: "#ff8a8a", fontSize: 14, margin: "10px 0 0" }}>סיסמה שגויה. נסו שוב.</p>
+        )}
+        <button type="submit" className="ga-btn ga-focus" style={{ ...primaryBtn, width: "100%", marginTop: 18 }}>כניסה</button>
+      </form>
+    </main>
+  );
+}
+
+function PrivatePage({ onLogout, onBack }) {
+  return (
+    <main style={{ maxWidth: 820, margin: "0 auto", padding: "56px 22px 90px" }}>
+      <button onClick={onBack} className="ga-link ga-focus" style={{ ...navBtn, fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--brand-lite)", marginBottom: 26 }}>→ חזרה לדף הבית</button>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--brand-lite)" }}>// אזור אישי</span>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px,5vw,40px)", margin: "10px 0 0" }}>אזור אישי</h1>
+        </div>
+        <button onClick={onLogout} className="ga-btn ga-focus" style={ghostBtn}>התנתקות</button>
+      </div>
+      <p style={{ color: "var(--alum-dim)", lineHeight: 1.8, fontSize: 16, margin: "18px 0 0" }}>
+        ברוכים הבאים לאזור האישי. כאן ניתן להוסיף תוכן פנימי המיועד לבעלי הרשאה בלבד.
+      </p>
     </main>
   );
 }
