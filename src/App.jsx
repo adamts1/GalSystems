@@ -83,15 +83,16 @@ export default function App() {
       {/* NAV */}
       <header style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,22,32,.86)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)" }}>
         <nav className="ga-nav">
-          <button onClick={() => { setView("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="ga-focus" style={{ background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 8 }}>
-            <img src="/logo.webp" alt='גל-מערכות רכב (1992) בע"מ' style={{ height: 42, background: "#fff", borderRadius: 6, padding: "4px 8px" }} />
-          </button>
+
           <div className="ga-nav-links">
             <button className="ga-link ga-focus" onClick={() => go("about")} style={navBtn}>אודות</button>
             <button className="ga-link ga-focus" onClick={() => go("contact")} style={navBtn}>צור קשר</button>
             <button className="ga-link ga-focus" onClick={openPrivacy} style={navBtn}>מדיניות פרטיות</button>
             <button className="ga-link ga-focus" onClick={openLogin} style={navBtn}>{authed ? "אזור אישי" : "כניסה"}</button>
           </div>
+            <button onClick={() => { setView("home"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="ga-focus" style={{ background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 8 }}>
+              <img src="/logo.webp" alt='גל-מערכות רכב (1992) בע"מ' style={{ height: 42, background: "#fff", borderRadius: 6, padding: "4px 8px" }} />
+            </button>
         </nav>
       </header>
 
@@ -136,7 +137,7 @@ function Home({ go }) {
         <div className="ga-hero">
           <Reveal style={{ textAlign: "center" }}>
             <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(34px, 5vw, 60px)", lineHeight: 1.08, margin: "0 0 20px", color: "var(--alum)" }}>
-              מנועים, תיבות הילוכים<br />וחלקי רכב - <span style={{ color: "var(--brand-lite)" }}>לכל רכב</span>
+              גל מערכות רכב
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.75, color: "var(--alum-dim)", maxWidth: 560, margin: "0 auto 30px" }}>
               למעלה מ-30 שנה אנו מייבאים ומשווקים מנועי בנזין ודיזל, תיבות הילוכים אוטומטיות ורגילות,
