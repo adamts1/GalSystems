@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from "react";
+import { API_BASE } from "./config";
+import { navBtn, primaryBtn, ghostBtn } from "./styles";
+import UploadDebts from "./components/UploadDebts";
 
 // =============================================================================
 //  גל-מערכות רכב (1992) בע"מ - דף נחיתה + מדיניות פרטיות
@@ -11,10 +14,6 @@ import { useState, useEffect, useRef } from "react";
 // סיסמת הכניסה לאזור הפרטי. שימו לב: זהו שער בצד-לקוח בלבד ואינו אבטחה אמיתית -
 // הסיסמה גלויה בקוד המקור של הדף. מתאים להגבלת גישה קלה בלבד.
 const PRIVATE_PASSWORD = "Gal123!";
-
-const navBtn = { background: "none", border: "none", color: "inherit", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: "inherit", padding: 0 };
-const primaryBtn = { background: "var(--brand)", color: "#fff", border: "none", borderRadius: 8, padding: "13px 26px", fontSize: 16, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", boxShadow: "0 6px 22px rgba(31,119,201,.30)" };
-const ghostBtn = { background: "transparent", color: "var(--alum)", border: "1px solid var(--line)", borderRadius: 8, padding: "13px 26px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" };
 
 function useReveal() {
   const ref = useRef(null);
@@ -257,42 +256,20 @@ function LoginPage({ onSuccess, onBack }) {
   );
 }
 
+// האזור האישי: מציג את רשימת הלקוחות והחובות, ומאפשר העלאת קובץ ומחיקה.
+// העלאת הקובץ מטופלת ברכיב הנפרד <UploadDebts/>.
 function PrivatePage({ onLogout, onBack }) {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState(null); // { type: 'ok' | 'err', text }
-  const fileRef = useRef(null);
 
-  const base = import.meta.env.VITE_UPLOAD_URL || "http://localhost:4000";
-
+  // עיצוב סכום עם מפרידי אלפים בעברית (לדוגמה 11,063).
   const fmtAmount = (n) => (typeof n === 'number' ? n.toLocaleString('he-IL') : n);
 
-  const handleUpload = async () => {
-    const file = fileRef.current?.files?.[0];
-    if (!file) { setUploadMsg({ type: 'err', text: 'בחר קובץ תחילה' }); return; }
-    setUploadMsg(null);
-    try {
-      setUploading(true);
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch(base + "/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || JSON.stringify(data));
-      setUploadMsg({ type: 'ok', text: `הועלו ${data.rows} שורות ל-${data.customersCount} לקוחות` });
-      if (fileRef.current) fileRef.current.value = "";
-      await fetchCustomers();
-    } catch (err) {
-      setUploadMsg({ type: 'err', text: 'שגיאה בהעלאה: ' + err });
-    } finally {
-      setUploading(false);
-    }
-  };
-
+  // שליפת רשימת הלקוחות מהשרת.
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const res = await fetch(base + "/customers");
+      const res = await fetch(API_BASE + "/customers");
       const data = await res.json();
       setCustomers(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -301,24 +278,27 @@ function PrivatePage({ onLogout, onBack }) {
     } finally { setLoading(false); }
   };
 
+  // טעינה ראשונית בעת כניסה לאזור האישי.
   useEffect(() => {
     fetchCustomers();
   }, []);
 
+  // מחיקת חוב בודד לפי שם לקוח ואינדקס, ואז רענון הרשימה.
   const deleteDebt = async (customerName, idx) => {
     if (!confirm(`להסיר חוב מס' ${idx + 1} של ${customerName}?`)) return;
     try {
-      const res = await fetch(base + "/delete-debt", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName, debtIndex: idx }) });
+      const res = await fetch(API_BASE + "/delete-debt", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName, debtIndex: idx }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Error');
       await fetchCustomers();
     } catch (err) { alert('שגיאה: ' + err); }
   };
 
+  // מחיקת לקוח שלם על כל חובותיו, ואז רענון הרשימה.
   const deleteCustomer = async (customerName) => {
     if (!confirm(`להסיר את הלקוח "${customerName}" וכל החובות שלו?`)) return;
     try {
-      const res = await fetch(base + "/delete-customer", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName }) });
+      const res = await fetch(API_BASE + "/delete-customer", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Error');
       await fetchCustomers();
@@ -333,18 +313,13 @@ function PrivatePage({ onLogout, onBack }) {
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--brand-lite)' }}>// אזור אישי</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px,4vw,30px)', margin: '6px 0 0' }}>אזור אישי</h1>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <label style={{ fontSize: 13, color: 'var(--alum-dim)' }}>העלה קובץ XLSX</label>
-          <input ref={fileRef} id="debt-file" type="file" accept=".xlsx,.xls" disabled={uploading} />
-          <button onClick={handleUpload} disabled={uploading} className="ga-btn ga-focus" style={ghostBtn}>{uploading ? 'מעלה...' : 'העלה'}</button>
+        {/* סרגל פעולות: העלאת קובץ (רכיב נפרד), רענון והתנתקות */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <UploadDebts onUploaded={fetchCustomers} />
           <button onClick={fetchCustomers} className="ga-btn ga-focus" style={ghostBtn}>רענן</button>
           <button onClick={onLogout} className="ga-btn ga-focus" style={ghostBtn}>התנתקות</button>
         </div>
       </div>
-
-      {uploadMsg && (
-        <p role="alert" style={{ margin: '0 0 14px', fontSize: 14, color: uploadMsg.type === 'ok' ? 'var(--brand-lite)' : '#ff8a8a' }}>{uploadMsg.text}</p>
-      )}
 
       <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 14, background: 'var(--panel)' }}>
         <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
