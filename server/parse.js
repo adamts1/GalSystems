@@ -13,6 +13,7 @@ import XLSX from "xlsx";
 
 const COLS = {
   date: "__EMPTY_26",     // תאריך
+  address: "__EMPTY_31",  // כתובת
   contact: "__EMPTY_34",  // contact name (unlabeled in the header)
   balance: "__EMPTY_37",  // יתרה
   status: "__EMPTY_38",   // מצב
@@ -98,6 +99,7 @@ export function parseDebtReport(buffer) {
         code: headerMatch[2],
         phone: null,
         contact: null,
+        address: null,
         debts: [],
         total: null,
       };
@@ -108,9 +110,11 @@ export function parseDebtReport(buffer) {
     // Debt line row: a real date + a numeric amount.
     const amt = parseAmount(amount);
     if (current && isDate(date) && amt != null) {
+      const address = txt(r[COLS.address]);
       current.debts.push({ date, asmachta, amount: amt, status });
 
       if (contact && !current.contact) current.contact = contact;
+      if (address && !current.address && !isDashes(address)) current.address = address;
       if (details && !isDashes(details)) {
         if (!current.phone) {
           const phone = extractPhone(details);

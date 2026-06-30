@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { API_BASE } from "./config";
 import { navBtn, primaryBtn, ghostBtn } from "./styles";
 import UploadDebts from "./components/UploadDebts";
+import CustomersList from "./components/CustomersList";
 
 // =============================================================================
 //  גל-מערכות רכב (1992) בע"מ - דף נחיתה + מדיניות פרטיות
@@ -256,16 +257,19 @@ function LoginPage({ onSuccess, onBack }) {
   );
 }
 
-// האזור האישי: מציג את רשימת הלקוחות והחובות, ומאפשר העלאת קובץ ומחיקה.
-// העלאת הקובץ מטופלת ברכיב הנפרד <UploadDebts/>.
+// האזור האישי: שני שלבים על אותו מסך —
+//   1) תצוגה מקדימה: טוענים קובץ, סוקרים ומסירים שורות (בדפדפן בלבד).
+//   2) שמירה: כפתור "העלה למסד" כותב את הרשימה שנשארה למסד הנתונים.
+// כשאין תצוגה מקדימה פעילה, מוצגים הנתונים השמורים (הקמפיין הפעיל) מהמסד.
 function PrivatePage({ onLogout, onBack }) {
-  const [customers, setCustomers] = useState([]);
+  const [customers, setCustomers] = useState([]); // הנתונים השמורים מהמסד
   const [loading, setLoading] = useState(false);
+  const [preview, setPreview] = useState(null);   // { fileName, customers } לפני שמירה
+  const [committing, setCommitting] = useState(false);
 
-  // עיצוב סכום עם מפרידי אלפים בעברית (לדוגמה 11,063).
-  const fmtAmount = (n) => (typeof n === 'number' ? n.toLocaleString('he-IL') : n);
+  console.log(customers)
 
-  // שליפת רשימת הלקוחות מהשרת.
+  // שליפת רשימת הלקוחות השמורים מהשרת.
   const fetchCustomers = async () => {
     try {
       setLoading(true);
@@ -283,27 +287,72 @@ function PrivatePage({ onLogout, onBack }) {
     fetchCustomers();
   }, []);
 
-  // מחיקת חוב בודד לפי שם לקוח ואינדקס, ואז רענון הרשימה.
-  const deleteDebt = async (customerName, idx) => {
-    if (!confirm(`להסיר חוב מס' ${idx + 1} של ${customerName}?`)) return;
+  // ---- שלב 1: עריכת התצוגה המקדימה (state מקומי, ללא מסד) ----
+
+  // הסרת חוב בודד מהתצוגה המקדימה; אם ללקוח לא נותרו חובות — מסירים גם אותו.
+  const removePreviewDebt = (c, ci, d, i) => {
+    if (!confirm(`להסיר חוב מס' ${i + 1} של ${c.name}?`)) return;
+    setPreview((p) => {
+      const list = p.customers.slice();
+      const cust = { ...list[ci], debts: list[ci].debts.filter((_, idx) => idx !== i) };
+      if (cust.debts.length === 0) {
+        list.splice(ci, 1); // לא נותרו חובות → מסירים את הלקוח
+      } else {
+        if (typeof cust.total === "number") cust.total -= d.amount; // מעדכנים סה"כ
+        list[ci] = cust;
+      }
+      return { ...p, customers: list };
+    });
+  };
+
+  // הסרת לקוח שלם מהתצוגה המקדימה.
+  const removePreviewCustomer = (c, ci) => {
+    if (!confirm(`להסיר את הלקוח "${c.name}" וכל החובות שלו מהתצוגה?`)) return;
+    setPreview((p) => ({ ...p, customers: p.customers.filter((_, idx) => idx !== ci) }));
+  };
+
+  // שמירת הרשימה שנותרה למסד הנתונים (פותח קמפיין חדש וסוגר את הקודם).
+  const commit = async () => {
+    if (!preview || preview.customers.length === 0) return;
     try {
-      const res = await fetch(API_BASE + "/delete-debt", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName, debtIndex: idx }) });
+      setCommitting(true);
+      const res = await fetch(API_BASE + "/commit", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fileName: preview.fileName, customers: preview.customers }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Error");
+      setPreview(null);        // יוצאים ממצב תצוגה מקדימה
+      await fetchCustomers();   // מציגים את הנתונים השמורים
+    } catch (err) {
+      alert("שגיאה בשמירה: " + err);
+    } finally { setCommitting(false); }
+  };
+
+  // ---- שלב 2: מחיקה מהנתונים השמורים (קוראת לשרת ומוחקת מהמסד) ----
+
+  const deleteDebt = async (c, ci, d, i) => {
+    if (!confirm(`להסיר חוב מס' ${i + 1} של ${c.name}?`)) return;
+    try {
+      const res = await fetch(API_BASE + "/delete-debt", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ debtId: d.id }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Error');
       await fetchCustomers();
     } catch (err) { alert('שגיאה: ' + err); }
   };
 
-  // מחיקת לקוח שלם על כל חובותיו, ואז רענון הרשימה.
-  const deleteCustomer = async (customerName) => {
-    if (!confirm(`להסיר את הלקוח "${customerName}" וכל החובות שלו?`)) return;
+  const deleteCustomer = async (c, ci) => {
+    if (!confirm(`להסיר את הלקוח "${c.name}" וכל החובות שלו?`)) return;
     try {
-      const res = await fetch(API_BASE + "/delete-customer", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerName }) });
+      const res = await fetch(API_BASE + "/delete-customer", { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ customerId: c.id }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error || 'Error');
       await fetchCustomers();
     } catch (err) { alert('שגיאה: ' + err); }
   };
+
+  const previewRows = preview ? preview.customers.reduce((s, c) => s + c.debts.length, 0) : 0;
 
   return (
     <main style={{ maxWidth: 920, margin: "0 auto", padding: "32px 22px 90px" }}>
@@ -313,64 +362,53 @@ function PrivatePage({ onLogout, onBack }) {
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--brand-lite)' }}>// אזור אישי</div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(22px,4vw,30px)', margin: '6px 0 0' }}>אזור אישי</h1>
         </div>
-        {/* סרגל פעולות: העלאת קובץ (רכיב נפרד), רענון והתנתקות */}
+        {/* סרגל פעולות: טעינת קובץ לתצוגה (רכיב נפרד), רענון והתנתקות */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-          <UploadDebts onUploaded={fetchCustomers} />
+          <UploadDebts onParsed={setPreview} disabled={committing} />
           <button onClick={fetchCustomers} className="ga-btn ga-focus" style={ghostBtn}>רענן</button>
           <button onClick={onLogout} className="ga-btn ga-focus" style={ghostBtn}>התנתקות</button>
         </div>
       </div>
 
-      <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 14, background: 'var(--panel)' }}>
-        <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ color: 'var(--alum-dim)' }}>לקוחות וחשבונות (הצג/מחק)</div>
-          <div style={{ color: 'var(--alum-dim)' }}>{loading ? 'טוען...' : `${customers.length} לקוחות`}</div>
-        </div>
-
-        {customers.length === 0 ? (
-          <div style={{ color: 'var(--alum-dim)' }}>אין לקוחות להצגה</div>
-        ) : (
-          <div style={{ display: 'grid', gap: 12 }}>
-            {customers.map((c) => (
-              <div key={c.code || c.name} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: 12, background: 'var(--panel2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div>
-                    <div style={{ fontSize: 16, fontFamily: 'var(--font-display)' }}>
-                      {c.name}{c.code && <span style={{ color: 'var(--alum-dim)', fontFamily: 'var(--font-mono)', fontSize: 13 }}> · {c.code}</span>}
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 4, fontSize: 13, color: 'var(--alum-dim)' }}>
-                      {c.phone && <a href={`tel:${c.phone}`} className="ga-focus" style={{ color: 'var(--brand-lite)', fontFamily: 'var(--font-mono)' }}>{c.phone}</a>}
-                      {c.contact && <span>איש קשר: {c.contact}</span>}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                    {c.total != null && (
-                      <div style={{ textAlign: 'left' }}>
-                        <div style={{ fontSize: 11, color: 'var(--alum-dim)' }}>סה"כ חוב</div>
-                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 15 }}>{fmtAmount(c.total)} ₪</div>
-                      </div>
-                    )}
-                    <button onClick={() => deleteCustomer(c.name)} className="ga-btn ga-focus" style={ghostBtn}>מחק לקוח</button>
-                  </div>
-                </div>
-                <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
-                  {Array.isArray(c.debts) && c.debts.length > 0 ? c.debts.map((d, i) => (
-                    <div key={i} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto auto', gap: 12, alignItems: 'center', padding: '8px 10px', border: '1px solid var(--line)', borderRadius: 8, background: 'var(--panel)', fontSize: 14 }}>
-                      <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--alum-dim)' }}>{d.date}</span>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.asmachta}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)' }}>{fmtAmount(d.amount)} ₪</span>
-                      <span style={{ fontSize: 12, color: d.status === 'פתוח' ? 'var(--brand-lite)' : 'var(--alum-dim)' }}>{d.status}</span>
-                      <button onClick={() => deleteDebt(c.name, i)} className="ga-btn ga-focus" style={{ ...ghostBtn, padding: '4px 8px', fontSize: 12 }}>מחק</button>
-                    </div>
-                  )) : (
-                    <div style={{ color: 'var(--alum-dim)' }}>אין חובות</div>
-                  )}
-                </div>
+      {preview ? (
+        /* ---- שלב 1: תצוגה מקדימה (לפני שמירה) ---- */
+        <div style={{ border: '1px solid var(--brand-lite)', borderRadius: 12, padding: 14, background: 'var(--panel)' }}>
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 16 }}>תצוגה מקדימה — סקור והסר שורות לפני שמירה</div>
+              <div style={{ color: 'var(--alum-dim)', fontSize: 13, marginTop: 2 }}>
+                {preview.fileName ? `${preview.fileName} · ` : ''}{previewRows} שורות · {preview.customers.length} לקוחות
               </div>
-            ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={commit} disabled={committing || preview.customers.length === 0} className="ga-btn ga-focus" style={primaryBtn}>
+                {committing ? 'שומר...' : 'העלה למסד'}
+              </button>
+              <button onClick={() => setPreview(null)} disabled={committing} className="ga-btn ga-focus" style={ghostBtn}>ביטול</button>
+            </div>
           </div>
-        )}
-      </div>
+
+          {preview.customers.length === 0 ? (
+            <div style={{ color: 'var(--alum-dim)' }}>לא נותרו לקוחות לשמירה. בטל או טען קובץ מחדש.</div>
+          ) : (
+            <CustomersList customers={preview.customers} onDeleteCustomer={removePreviewCustomer} onDeleteDebt={removePreviewDebt} />
+          )}
+        </div>
+      ) : (
+        /* ---- שלב 2: הנתונים השמורים (מהמסד) ---- */
+        <div style={{ border: '1px solid var(--line)', borderRadius: 12, padding: 14, background: 'var(--panel)' }}>
+          <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ color: 'var(--alum-dim)' }}>לקוחות וחשבונות שמורים (הצג/מחק)</div>
+            <div style={{ color: 'var(--alum-dim)' }}>{loading ? 'טוען...' : `${customers.length} לקוחות`}</div>
+          </div>
+
+          {customers.length === 0 ? (
+            <div style={{ color: 'var(--alum-dim)' }}>אין לקוחות להצגה. טען קובץ XLSX כדי להתחיל.</div>
+          ) : (
+            <CustomersList customers={customers} onDeleteCustomer={deleteCustomer} onDeleteDebt={deleteDebt} />
+          )}
+        </div>
+      )}
     </main>
   );
 }

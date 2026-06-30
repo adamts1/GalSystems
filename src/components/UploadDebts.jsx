@@ -3,50 +3,55 @@ import { API_BASE } from "../config";
 import { ghostBtn } from "../styles";
 
 // =============================================================================
-//  UploadDebts - העלאת קובץ XLSX של חובות לשרת
+//  UploadDebts - בחירת קובץ XLSX וניתוחו לתצוגה מקדימה (ללא שמירה במסד הנתונים)
 //
-//  רכיב עצמאי שמטפל בבחירת קובץ, שליחתו ל־POST /upload, והצגת הודעת סטטוס.
-//  לאחר העלאה מוצלחת מפעיל את onUploaded() כדי שההורה ירענן את רשימת הלקוחות.
+//  שלב 1 בתהליך: שולח את הקובץ ל־POST /parse, ומחזיר להורה את רשימת הלקוחות
+//  שפוענחה דרך onParsed(). השמירה למסד הנתונים מתבצעת רק בשלב הבא (כפתור "העלה
+//  למסד") לאחר שהמשתמש סקר והסיר שורות.
 //
 //  Props:
-//    onUploaded?: () => void  - נקרא אחרי העלאה מוצלחת (לרענון הרשימה).
+//    onParsed?: ({ fileName, customers }) => void  - נקרא אחרי ניתוח מוצלח.
+//    disabled?: boolean                            - חוסם בחירה בזמן עיבוד אחר.
 // =============================================================================
-export default function UploadDebts({ onUploaded }) {
-  const [uploading, setUploading] = useState(false);
+export default function UploadDebts({ onParsed, disabled }) {
+  const [parsing, setParsing] = useState(false);
   const [msg, setMsg] = useState(null); // { type: 'ok' | 'err', text }
   const fileRef = useRef(null);
 
-  const handleUpload = async () => {
+  const handleParse = async () => {
     const file = fileRef.current?.files?.[0];
     if (!file) { setMsg({ type: "err", text: "בחר קובץ תחילה" }); return; }
 
     setMsg(null);
     try {
-      setUploading(true);
+      setParsing(true);
       // שולחים את הקובץ כ־multipart/form-data תחת השדה "file".
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(API_BASE + "/upload", { method: "POST", body: fd });
+      const res = await fetch(API_BASE + "/parse", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || JSON.stringify(data));
 
-      setMsg({ type: "ok", text: `הועלו ${data.rows} שורות ל-${data.customersCount} לקוחות` });
+      const rows = data.customers.reduce((s, c) => s + c.debts.length, 0);
+      setMsg({ type: "ok", text: `נטענו ${rows} שורות ל-${data.customers.length} לקוחות לתצוגה` });
       if (fileRef.current) fileRef.current.value = ""; // מאפסים את שדה הקובץ
-      onUploaded?.(); // מודיעים להורה לרענן את הרשימה
+      onParsed?.({ fileName: data.fileName, customers: data.customers });
     } catch (err) {
-      setMsg({ type: "err", text: "שגיאה בהעלאה: " + err });
+      setMsg({ type: "err", text: "שגיאה בניתוח: " + err });
     } finally {
-      setUploading(false);
+      setParsing(false);
     }
   };
+
+  const busy = parsing || disabled;
 
   return (
     <div>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <label style={{ fontSize: 13, color: "var(--alum-dim)" }}>העלה קובץ XLSX</label>
-        <input ref={fileRef} id="debt-file" type="file" accept=".xlsx,.xls" disabled={uploading} />
-        <button onClick={handleUpload} disabled={uploading} className="ga-btn ga-focus" style={ghostBtn}>
-          {uploading ? "מעלה..." : "העלה"}
+        <label style={{ fontSize: 13, color: "var(--alum-dim)" }}>טען קובץ XLSX</label>
+        <input ref={fileRef} id="debt-file" type="file" accept=".xlsx,.xls" disabled={busy} />
+        <button onClick={handleParse} disabled={busy} className="ga-btn ga-focus" style={ghostBtn}>
+          {parsing ? "טוען..." : "טען לתצוגה"}
         </button>
       </div>
 
