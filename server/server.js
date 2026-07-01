@@ -11,6 +11,7 @@ import {
   deleteDebtById,
   deleteCustomerById,
 } from "./campaigns.js";
+import { triggerCampaignWebhook } from "./n8n.js";
 
 const app = express();
 app.use(cors());
@@ -50,6 +51,11 @@ app.post("/commit", async (req, res) => {
       return res.status(400).json({ error: "No customers to commit" });
     }
     const campaign = await createCampaignFromUpload(fileName ?? null, customers);
+
+    // Kick off the n8n process for the just-created campaign. Fire-and-forget so
+    // a slow/down n8n never blocks or fails the user's upload.
+    triggerCampaignWebhook(campaign.id);
+
     res.json({
       ok: true,
       campaignId: campaign.id,

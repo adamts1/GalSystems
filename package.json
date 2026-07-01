@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/server.js",
+    "server:watch": "node --watch server/server.js",
     "kill-server": "lsof -ti :4000 | xargs kill 2>/dev/null || echo 'port 4000 is free'",
     "db:setup": "node server/setup-db.js",
     "db:wipe": "node server/wipe-db.js"
